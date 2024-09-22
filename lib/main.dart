@@ -584,6 +584,17 @@ class _ComplainScreenState extends State<ComplainScreen> {
   TextEditingController _registrationNumberController = TextEditingController();
   String? _complaintStatus;
   String? _registrationTime;
+  bool _isButtonEnabled = false;
+
+  void _checkFormValidity() {
+    setState(() {
+      _isButtonEnabled = _selectedCategory != null &&
+          _blockNumberController.text.isNotEmpty &&
+          _roomNumberController.text.isNotEmpty &&
+          _nameController.text.isNotEmpty &&
+          _registrationNumberController.text.isNotEmpty;
+    });
+  }
 
   void _showQueryDialog() {
     showDialog(
@@ -713,25 +724,22 @@ class _ComplainScreenState extends State<ComplainScreen> {
                   setState(() {
                     _selectedCategory = newValue;
                   });
+                  _checkFormValidity();
                 },
               ),
               const SizedBox(height: 20),
-              _buildTextField('Block Number', _blockNumberController),
+              _buildTextField('Enter Block', _blockNumberController),
               _buildTextField('Room Number', _roomNumberController),
               _buildTextField('Name', _nameController),
               _buildTextField(
                   'Registration Number', _registrationNumberController),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: _selectedCategory != null &&
-                        _blockNumberController.text.isNotEmpty &&
-                        _roomNumberController.text.isNotEmpty &&
-                        _nameController.text.isNotEmpty &&
-                        _registrationNumberController.text.isNotEmpty
-                    ? null
-                    : () {
+                onPressed: _isButtonEnabled
+                    ? () {
                         _showQueryDialog(); // Show the query input dialog
-                      },
+                      }
+                    : null,
                 child: const Text('Submit Complaint'),
               ),
             ],
@@ -750,6 +758,9 @@ class _ComplainScreenState extends State<ComplainScreen> {
           labelText: label,
           border: OutlineInputBorder(),
         ),
+        onChanged: (value) {
+          _checkFormValidity();
+        },
       ),
     );
   }
@@ -820,10 +831,22 @@ class _NightLibraryScreenState extends State<NightLibraryScreen> {
         _errorMessage = 'Student ID must be 9 characters';
       });
     } else {
+      // Generate the current timestamp
+      final String currentTime =
+          DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+      final DateTime expiryTime = DateTime.now().add(Duration(minutes: 1));
+      final String expiryTimeString =
+          DateFormat('yyyy-MM-dd HH:mm:ss').format(expiryTime);
+
+      // Include the timestamp and expiry in the QR data
+      final String qrData =
+          'Student Name: $studentName\nStudent ID: $studentId\nGenerated On: $currentTime\nValid Until: $expiryTimeString';
+
       Navigator.of(context).push(
         MaterialPageRoute(
           builder: (context) => QrCodeScreen(
-            qrData: 'Student Name: $studentName\nStudent ID: $studentId',
+            qrData: qrData,
+            expiryTime: expiryTime,
           ),
         ),
       );
@@ -834,7 +857,7 @@ class _NightLibraryScreenState extends State<NightLibraryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Night Library QR Code'),
+        title: const Text('Night Library Slip'),
         centerTitle: true,
       ),
       body: Padding(
@@ -845,16 +868,13 @@ class _NightLibraryScreenState extends State<NightLibraryScreen> {
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(
-                labelText: 'Enter Student Name',
-                border: OutlineInputBorder(),
+                labelText: 'Student Name',
               ),
             ),
-            const SizedBox(height: 16),
             TextField(
               controller: _idController,
               decoration: const InputDecoration(
-                labelText: 'Enter Student ID',
-                border: OutlineInputBorder(),
+                labelText: 'Student ID (9 characters)',
               ),
             ),
             const SizedBox(height: 16),
@@ -878,16 +898,17 @@ class _NightLibraryScreenState extends State<NightLibraryScreen> {
   }
 }
 
+// QR Code Screen
 class QrCodeScreen extends StatelessWidget {
   final String qrData;
+  final DateTime expiryTime;
 
-  const QrCodeScreen({required this.qrData});
+  const QrCodeScreen({required this.qrData, required this.expiryTime});
 
   @override
   Widget build(BuildContext context) {
-    // Get the current time in a readable format
-    final String currentTime =
-        DateFormat('yyyy-MM-dd HH:mm:ss').format(DateTime.now());
+    // Get the current time
+    final DateTime now = DateTime.now();
 
     return Scaffold(
       appBar: AppBar(
@@ -915,8 +936,19 @@ class QrCodeScreen extends StatelessWidget {
             const SizedBox(
                 height: 8), // Small space between message and timestamp
             Text(
-              'Generated on: $currentTime',
+              'Generated on: ${DateFormat('yyyy-MM-dd HH:mm:ss').format(now)}',
               style: const TextStyle(fontSize: 16, color: Colors.black54),
+            ),
+            const SizedBox(height: 8),
+            // Check validity and show relevant message
+            Text(
+              now.isBefore(expiryTime)
+                  ? 'This QR code is valid.'
+                  : 'This QR code has expired.',
+              style: TextStyle(
+                fontSize: 16,
+                color: now.isBefore(expiryTime) ? Colors.green : Colors.red,
+              ),
             ),
           ],
         ),
